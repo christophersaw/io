@@ -54,6 +54,39 @@ dfm=pd.merge(df, df2, on=['store','week','product']) # this is a one-one merge
 #dfm.to_csv('dfm.csv', index=False)
 
 
+# hausman price instruments are package prices, convert to unit prices
+dfm['pricestore1']=dfm['pricestore1']*dfm['packagesales']/dfm['sales']
+dfm['pricestore2']=dfm['pricestore2']*dfm['packagesales']/dfm['sales']
+dfm['pricestore3']=dfm['pricestore3']*dfm['packagesales']/dfm['sales']
+dfm['pricestore4']=dfm['pricestore4']*dfm['packagesales']/dfm['sales']
+dfm['pricestore5']=dfm['pricestore5']*dfm['packagesales']/dfm['sales']
+dfm['pricestore6']=dfm['pricestore6']*dfm['packagesales']/dfm['sales']
+dfm['pricestore7']=dfm['pricestore7']*dfm['packagesales']/dfm['sales']
+dfm['pricestore8']=dfm['pricestore8']*dfm['packagesales']/dfm['sales']
+dfm['pricestore9']=dfm['pricestore9']*dfm['packagesales']/dfm['sales']
+dfm['pricestore10']=dfm['pricestore10']*dfm['packagesales']/dfm['sales']
+dfm['pricestore11']=dfm['pricestore11']*dfm['packagesales']/dfm['sales']
+dfm['pricestore12']=dfm['pricestore12']*dfm['packagesales']/dfm['sales']
+dfm['pricestore13']=dfm['pricestore13']*dfm['packagesales']/dfm['sales']
+dfm['pricestore14']=dfm['pricestore14']*dfm['packagesales']/dfm['sales']
+dfm['pricestore15']=dfm['pricestore15']*dfm['packagesales']/dfm['sales']
+dfm['pricestore16']=dfm['pricestore16']*dfm['packagesales']/dfm['sales']
+dfm['pricestore17']=dfm['pricestore17']*dfm['packagesales']/dfm['sales']
+dfm['pricestore18']=dfm['pricestore18']*dfm['packagesales']/dfm['sales']
+dfm['pricestore19']=dfm['pricestore19']*dfm['packagesales']/dfm['sales']
+dfm['pricestore20']=dfm['pricestore20']*dfm['packagesales']/dfm['sales']
+dfm['pricestore21']=dfm['pricestore21']*dfm['packagesales']/dfm['sales']
+dfm['pricestore22']=dfm['pricestore22']*dfm['packagesales']/dfm['sales']
+dfm['pricestore23']=dfm['pricestore23']*dfm['packagesales']/dfm['sales']
+dfm['pricestore24']=dfm['pricestore24']*dfm['packagesales']/dfm['sales']
+dfm['pricestore25']=dfm['pricestore25']*dfm['packagesales']/dfm['sales']
+dfm['pricestore26']=dfm['pricestore26']*dfm['packagesales']/dfm['sales']
+dfm['pricestore27']=dfm['pricestore27']*dfm['packagesales']/dfm['sales']
+dfm['pricestore28']=dfm['pricestore28']*dfm['packagesales']/dfm['sales']
+dfm['pricestore29']=dfm['pricestore29']*dfm['packagesales']/dfm['sales']
+dfm['pricestore30']=dfm['pricestore30']*dfm['packagesales']/dfm['sales']
+
+
 # rename columns to fit pyblp syntax
 dfm=dfm.rename(columns={'price': 'prices'})
 dfm=dfm.rename(columns={'cost': 'demand_instruments0',
@@ -138,21 +171,67 @@ mc_problem=pyblp.Problem(product_formulations, product_data, agent_formulation, 
 # Optimization routine (many options in pyblp)
 bfgs=pyblp.Optimization('bfgs', {'gtol': 1e-4})
 
-# need to weight the instruments by ZZ' ^ -1
-# need to set up solver, it will look something like this:
+# see https://pyblp.readthedocs.io/en/stable/background.html#equation-w for the weighting matrix
 
-# initial_sigma = np.diag([0.3302, 2.4526, 0.0163, 0.2441])   # how to find starting values of sigma and pi? note we have 6 variables incl. constant
-# initial_pi = np.array([
-#   [ 5.4819,  0,      0.2037,  0     ],
-#   [15.8935, -1.2000, 0,       2.6342],
-#   [-0.2506,  0,      0.0511,  0     ],
-#   [ 1.2650,  0,     -0.8091,  0     ]
-# ])
-# tighter_bfgs = pyblp.Optimization('bfgs', {'gtol': 1e-5})
-# nevo_results = nevo_problem.solve(
-#     initial_sigma,
-#     initial_pi,
-#     optimization=tighter_bfgs,
-#     method='1s'
-# )
-# nevo_results
+# Specify correlation and interaction structure across parameters
+# recall from class that sigma is a square matrix of (k+1) by (k+1)
+# and pi is a (k+1) by d matrix and we want to interact price with income
+initial_sigma=np.diag([1,1,1,1,1,1]) 	#no correlation across X2; for full correlation we put np.ones((6,6))
+initial_pi=np.array([
+[0],
+[1],
+[0],
+[0],
+[0],
+[0]
+	])
+tighter_bfgs = pyblp.Optimization('bfgs', {'gtol': 1e-5})
+results = mc_problem.solve(initial_sigma,initial_pi,optimization=tighter_bfgs,method='1s')
+results
+                                                                                                                                                                                            
+# Problem Results Summary:
+# =======================================================================================================
+# GMM   Objective  Gradient      Hessian         Hessian     Clipped  Weighting Matrix  Covariance Matrix
+# Step    Value      Norm    Min Eigenvalue  Max Eigenvalue  Shares   Condition Number  Condition Number 
+# ----  ---------  --------  --------------  --------------  -------  ----------------  -----------------
+#  1    +1.3E+03   +8.7E-06     +3.8E+00        +1.2E+04        0         +1.1E+04          +9.3E+08     
+# =======================================================================================================
+
+# Cumulative Statistics:
+# ===========================================================================
+# Computation  Optimizer  Optimization   Objective   Fixed Point  Contraction
+#    Time      Converged   Iterations   Evaluations  Iterations   Evaluations
+# -----------  ---------  ------------  -----------  -----------  -----------
+#  01:25:09       Yes          33           41        20756676     62415753  
+# ===========================================================================
+
+# Nonlinear Coefficient Estimates (Robust SEs in Parentheses):
+# =======================================================================================================
+# Sigma:       1         prices       prom      tylenol      advil       bayer     |    Pi:      income  
+# -------  ----------  ----------  ----------  ----------  ----------  ----------  |  -------  ----------
+#    1      +4.6E-01                                                               |     1      +0.0E+00 
+#          (+1.6E+00)                                                              |                     
+#                                                                                  |                     
+# prices    +0.0E+00    +1.0E+00                                                   |  prices    +5.0E-01 
+#                      (+2.3E-01)                                                  |           (+1.7E-01)
+#                                                                                  |                     
+#  prom     +0.0E+00    +0.0E+00    -1.5E-01                                       |   prom     +0.0E+00 
+#                                  (+3.6E+00)                                      |                     
+#                                                                                  |                     
+# tylenol   +0.0E+00    +0.0E+00    +0.0E+00    +1.3E+01                           |  tylenol   +0.0E+00 
+#                                              (+5.1E+00)                          |                     
+#                                                                                  |                     
+#  advil    +0.0E+00    +0.0E+00    +0.0E+00    +0.0E+00    +1.1E+01               |   advil    +0.0E+00 
+#                                                          (+7.6E+00)              |                     
+#                                                                                  |                     
+#  bayer    +0.0E+00    +0.0E+00    +0.0E+00    +0.0E+00    +0.0E+00    +1.0E+01   |   bayer    +0.0E+00 
+#                                                                      (+3.5E+00)  |                     
+# =======================================================================================================
+
+# Beta Estimates (Robust SEs in Parentheses):
+# ==========================================================
+#   prices       prom      tylenol      advil       bayer   
+# ----------  ----------  ----------  ----------  ----------
+#  -8.3E+00    -2.1E+00    -1.5E+01    -1.2E+01    -1.5E+01 
+# (+1.8E+00)  (+2.8E-01)  (+9.2E+00)  (+1.2E+01)  (+5.9E+00)
+# ==========================================================
