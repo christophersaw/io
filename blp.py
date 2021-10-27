@@ -36,20 +36,29 @@ df['cost']=df['packagecost']*df['packagesales']/df['sales']		# cost is now unit 
 
 # create brand dummies for tylenol, advil, bayer
 df['tylenol']=0
-df.loc[dfm['product'].isin([1,2,3]), 'tylenol']=1
+df.loc[df['product'].isin([1,2,3]), 'tylenol']=1
 df['advil']=0
-df.loc[dfm['product'].isin([4,5,6]), 'advil']=1
+df.loc[df['product'].isin([4,5,6]), 'advil']=1
 df['bayer']=0
-df.loc[dfm['product'].isin([7,8,9]), 'bayer']=1
+df.loc[df['product'].isin([7,8,9]), 'bayer']=1
+
+
+# create brand x store dummies
+df['inter1']=df['tylenol']*df['store']
+df['inter2']=df['advil']*df['store']
+df['inter3']=df['bayer']*df['store']
 
 
 # calculate market ids and shares
-df['market_ids']=df.groupby(['store','week']).ngroup()
+df['market']=df.groupby(['store','week']).ngroup()
+df['x']='x'
+df['market_ids']=df['store'].astype(str)+df['x'].astype(str)+df['week'].astype(str)
 df['shares']=df['sales']/df['count']
+del(df['x'])
 
 
 # calculate inside and outside shares
-df['insideshare']=df.groupby(['market_ids'])['shares'].transform('sum')
+df['insideshare']=df.groupby(['market'])['shares'].transform('sum')
 # check that insideshares are between 0 and 1
 # df['insideshare'].min()
 # df['insideshare'].max()
@@ -119,65 +128,185 @@ dfm=dfm.rename(columns={'cost': 'demand_instruments0',
 # Load demographic data and reshape for pyblp (each row is an agent in market t)
 inc=pd.read_csv(r'OTCDemographics.csv',sep='\t')
 df3=pd.DataFrame(inc)
-df3['market_ids']=df3.groupby(['store','week']).ngroup()
+df3['x']='x'
+df3['market_ids']=df3['store'].astype(str)+df3['x'].astype(str)+df3['week'].astype(str)
+del(df3['x'])
 df4=pd.melt(df3, id_vars=['market_ids'], value_vars=[
 	'hhincome1','hhincome2','hhincome3','hhincome4','hhincome5','hhincome6','hhincome7','hhincome8','hhincome9','hhincome10',
 	'hhincome11','hhincome12','hhincome13','hhincome14','hhincome15','hhincome16','hhincome17','hhincome18','hhincome19','hhincome20'], 
 	var_name='agent_index', value_name='income')
 del(df4['agent_index'])
-#dfprint=df4.sort_values(by=['market_ids'])
-#dfprint.to_csv('agents_sorted.csv',index=False)
 
 
 
-### PART TWO: OLS/IV Logit regressions
-# Create dependent variable: Y = log(s_jt) - log(s_0t)
-dfm['log_share']=dfm['shares'].apply(lambda x: np.log(x))
-dfm['log_outside']=dfm['outsideshare'].apply(lambda x: np.log(x))
-dfm['y']=dfm['log_share']-dfm['log_outside']
+# ### PART TWO: OLS/IV Logit regressions
+# # Create dependent variable: Y = log(s_jt) - log(s_0t)
+# dfm['log_share']=dfm['shares'].apply(lambda x: np.log(x))
+# dfm['log_outside']=dfm['outsideshare'].apply(lambda x: np.log(x))
+# dfm['y']=dfm['log_share']-dfm['log_outside']
+
+# import linearmodels
+# from linearmodels import OLS
+# from linearmodels.iv import IV2SLS
+# from linearmodels.iv.absorbing import AbsorbingLS
+
+# exog_vars=['prices','prom']
+# X1=dfm[exog_vars]
+# model1 = OLS(dfm.y, X1).fit()
+# #print(model1)
+# #                             OLS Estimation Summary                            
+# # ==============================================================================
+# # Dep. Variable:                      y   R-squared:                      0.8823
+# # Estimator:                        OLS   Adj. R-squared:                 0.8823
+# # No. Observations:               38544   F-statistic:                 4.091e+05
+# # Date:                Wed, Oct 27 2021   P-value (F-stat)                0.0000
+# # Time:                        09:33:40   Distribution:                  chi2(2)
+# # Cov. Estimator:                robust                                         
+                                                                              
+# #                              Parameter Estimates                              
+# # ==============================================================================
+# #             Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+# # ------------------------------------------------------------------------------
+# # prices        -1.6235     0.0028    -578.07     0.0000     -1.6290     -1.6180
+# # prom          -2.5092     0.0346    -72.435     0.0000     -2.5771     -2.4413
+# # ==============================================================================
+
+# exog_vars=['prices','prom','tylenol','advil','bayer']
+# X2=dfm[exog_vars]
+# model2 = OLS(dfm.y, X2).fit()
+# #print(model2)
+# #                             OLS Estimation Summary                            
+# # ==============================================================================
+# # Dep. Variable:                      y   R-squared:                      0.9082
+# # Estimator:                        OLS   Adj. R-squared:                 0.9082
+# # No. Observations:               38544   F-statistic:                 7.133e+05
+# # Date:                Wed, Oct 27 2021   P-value (F-stat)                0.0000
+# # Time:                        09:33:40   Distribution:                  chi2(5)
+# # Cov. Estimator:                robust                                         
+                                                                              
+# #                              Parameter Estimates                              
+# # ==============================================================================
+# #             Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+# # ------------------------------------------------------------------------------
+# # prices        -1.6453     0.0112    -146.77     0.0000     -1.6672     -1.6233
+# # prom          -1.6077     0.0369    -43.602     0.0000     -1.6800     -1.5354
+# # tylenol        1.2412     0.0600     20.701     0.0000      1.1237      1.3587
+# # advil          0.3469     0.0593     5.8540     0.0000      0.2307      0.4630
+# # bayer         -2.1471     0.0434    -49.480     0.0000     -2.2321     -2.0620
+# # ==============================================================================
+
+# brandstoredummies = pd.DataFrame({'inter1': pd.Categorical(dfm.inter1), 'inter2': pd.Categorical(dfm.inter2),'inter3': pd.Categorical(dfm.inter3)})
+# model3=AbsorbingLS(dfm.y, X2, absorb=brandstoredummies, drop_absorbed=True).fit()
+# #print(model3)
+# #                          Absorbing LS Estimation Summary                          
+# # ==================================================================================
+# # Dep. Variable:                      y   R-squared:                          0.4858
+# # Estimator:               Absorbing LS   Adj. R-squared:                     0.4828
+# # No. Observations:               38544   F-statistic:                      2.21e+04
+# # Date:                Wed, Oct 27 2021   P-value (F-stat):                   0.0000
+# # Time:                        09:29:18   Distribution:                      chi2(2)
+# # Cov. Estimator:                robust   R-squared (No Effects):             0.3064
+# #                                         Variables Absorbed:                 220.00
+# #                              Parameter Estimates                              
+# # ==============================================================================
+# #             Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+# # ------------------------------------------------------------------------------
+# # prices        -0.3870     0.0028    -138.44     0.0000     -0.3924     -0.3815
+# # prom           0.3613     0.0144     25.037     0.0000      0.3330      0.3896
+# # ==============================================================================
+
+# exog_vars=['prom']
+# X1=dfm[exog_vars]
+# model4=IV2SLS(dfm.y, X1, dfm.prices, dfm.demand_instruments0).fit()
+# #print(model4)
+# #                           IV-2SLS Estimation Summary                          
+# # ==============================================================================
+# # Dep. Variable:                      y   R-squared:                      0.8823
+# # Estimator:                    IV-2SLS   Adj. R-squared:                 0.8823
+# # No. Observations:               38544   F-statistic:                 4.511e+05
+# # Date:                Wed, Oct 27 2021   P-value (F-stat)                0.0000
+# # Time:                        10:14:26   Distribution:                  chi2(2)
+# # Cov. Estimator:                robust                                         
+                                                                              
+# #                              Parameter Estimates                              
+# # ==============================================================================
+# #             Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+# # ------------------------------------------------------------------------------
+# # prom          -2.5362     0.0344    -73.686     0.0000     -2.6036     -2.4687
+# # prices        -1.6172     0.0027    -609.93     0.0000     -1.6224     -1.6120
+# # ==============================================================================
+
+# # Endogenous: prices
+# # Instruments: demand_instruments0
+# # Robust Covariance (Heteroskedastic)
+# # Debiased: False
+
+# exog_vars=['prom','tylenol','advil','bayer']
+# X2=dfm[exog_vars]
+# model5=IV2SLS(dfm.y, X2, dfm.prices, dfm.demand_instruments0).fit()
+# # print(model5)
+# #                           IV-2SLS Estimation Summary                          
+# # ==============================================================================
+# # Dep. Variable:                      y   R-squared:                      0.9079
+# # Estimator:                    IV-2SLS   Adj. R-squared:                 0.9079
+# # No. Observations:               38544   F-statistic:                 7.964e+05
+# # Date:                Wed, Oct 27 2021   P-value (F-stat)                0.0000
+# # Time:                        10:16:17   Distribution:                  chi2(5)
+# # Cov. Estimator:                robust                                         
+                                                                              
+# #                              Parameter Estimates                              
+# # ==============================================================================
+# #             Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+# # ------------------------------------------------------------------------------
+# # prom          -1.6106     0.0372    -43.283     0.0000     -1.6836     -1.5377
+# # tylenol        0.7570     0.0601     12.604     0.0000      0.6393      0.8747
+# # advil         -0.1329     0.0594    -2.2385     0.0252     -0.2492     -0.0165
+# # bayer         -2.4930     0.0430    -57.994     0.0000     -2.5772     -2.4087
+# # prices        -1.5502     0.0112    -138.30     0.0000     -1.5722     -1.5283
+# # ==============================================================================
+
+# # Endogenous: prices
+# # Instruments: demand_instruments0
+# # Robust Covariance (Heteroskedastic)
+# # Debiased: False
+
+# dfm['inter1']=dfm['inter1'].astype('category')
+# dfm['inter2']=dfm['inter2'].astype('category')
+# dfm['inter3']=dfm['inter3'].astype('category')
+# # set store 9 in week 10 as the base
+# dfm.loc[dfm['market_ids']=="9x10", 'inter1'] = 0
+# dfm.loc[dfm['market_ids']=="9x10", 'inter2'] = 0
+# dfm.loc[dfm['market_ids']=="9x10", 'inter3'] = 0 
+
+# exog_vars=['prom','inter1','inter2','inter3']
+# X3=dfm[exog_vars]
+# model6=IV2SLS(dfm.y, X3, dfm.prices, dfm.demand_instruments0).fit()
+# # print(model6)
+
+# #                           IV-2SLS Estimation Summary                          
+# # ==============================================================================
+# # Dep. Variable:                      y   R-squared:                      0.9086
+# # Estimator:                    IV-2SLS   Adj. R-squared:                 0.9081
+# # No. Observations:               38544   F-statistic:                 8.435e+05
+# # Date:                Wed, Oct 27 2021   P-value (F-stat)                0.0000
+# # Time:                        11:13:42   Distribution:                chi2(221)
+# # Cov. Estimator:                robust                                         
+                                                                              
+# #                              Parameter Estimates                              
+# # ==============================================================================
+# #             Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+# # ------------------------------------------------------------------------------
+# # prom          -1.6143     0.0370    -43.596     0.0000     -1.6868     -1.5417
+# # (omitted)
+# # prices        -1.5522     0.0111    -139.33     0.0000     -1.5740     -1.5304
+# # ==============================================================================
+
+# # Endogenous: prices
+# # Instruments: demand_instruments0
+# # Robust Covariance (Heteroskedastic)
+# # Debiased: False
 
 
-import stata_setup
-stata_setup.config("/Applications/Stata/", "se")
-from pystata import stata
-stata.pdataframe_to_data(dfm, force=True)
-stata.run('''
-cd "/Users/christophersaw/Desktop/blp"
-local model_1 prom
-local model_2 prom tylenol advil bayer
-local model_3 prom tylenol advil bayer tylenol#i.store advil#i.store bayer#i.store
-
-* Questions 1 to 3 (OLS/Logit model)
-forvalues m = 1/3{
-	quietly reg y prices `model_`m'', noconstant
-	outreg2 using PS1Q1.csv, append
-}
-
-* Questions 4 and 5 (IV/Logit model)
-* Hausman instruments
-quietly {
-	forvalues t = 0/3503 {
-		gen dummy = 1
-		replace dummy = 0 if market_ids == `t'
-		gen price2 = dummy*prices
-		replace price2 = . if price2==0
-		bysort product week: egen price3_`t' = mean(price2)
-		replace price3_`t' = 0 if market_ids != `t'
-		drop dummy price2
-	}
-	egen hausmanprice = rowtotal(price3_*)
-	drop price3_* 
-}
-forvalues m = 1/3{
-	quietly ivregress 2sls y `model_`m'' (prices = cost), noconstant
-	outreg2 using PS1Q1.csv, append
-}
-
-forvalues m = 1/3{
-	quietly ivregress 2sls y `model_`m'' (prices = hausmanprice), noconstant
-	outreg2 using PS1Q1.csv, append
-}
-	''')
 
 ### PART THREE 
 # set up pyblp
@@ -222,25 +351,23 @@ mc_problem=pyblp.Problem(product_formulations, product_data, agent_formulation, 
 #        d: Demographics         income                                        
 # =============================================================================
 
-# Optimization routine (many options in pyblp)
-bfgs=pyblp.Optimization('bfgs', {'gtol': 1e-4})
-
-# see https://pyblp.readthedocs.io/en/stable/background.html#equation-w for the weighting matrix
+# Optimization routines (many options in pyblp)
+bfgs = pyblp.Optimization('bfgs', {'gtol': 1e-4})
+tighter_bfgs = pyblp.Optimization('bfgs', {'gtol': 1e-5})
 
 # Specify correlation and interaction structure across parameters
 # recall from class that sigma is a square matrix of (k+1) by (k+1)
 # and pi is a (k+1) by d matrix and we want to interact price with income
-initial_sigma=np.diag([1,1,1,1,1,1]) 	#no correlation across X2; for full correlation we put np.ones((6,6))
+initial_sigma=np.diag([0.001,0.001,0.001,0.001,0.001,0.001]) 	#no correlation across X2
 initial_pi=np.array([
-[0],
-[1],
-[0],
-[0],
-[0],
-[0]
+	[0],
+	[0.001],
+	[0],
+	[0],
+	[0],
+	[0]
 	])
-tighter_bfgs = pyblp.Optimization('bfgs', {'gtol': 1e-5})
-results = mc_problem.solve(initial_sigma,initial_pi,optimization=tighter_bfgs,method='1s')
+results = mc_problem.solve(initial_sigma,initial_pi,optimization=bfgs,method='1s')
 #results
                                                                                                                                                                                             
 # Problem Results Summary:
@@ -288,63 +415,4 @@ results = mc_problem.solve(initial_sigma,initial_pi,optimization=tighter_bfgs,me
 # ----------  ----------  ----------  ----------  ----------
 #  -8.3E+00    -2.1E+00    -1.5E+01    -1.2E+01    -1.5E+01 
 # (+1.8E+00)  (+2.8E-01)  (+9.2E+00)  (+1.2E+01)  (+5.9E+00)
-# ==========================================================
-
-
-# allow correlation across prom and brands
-initial_sigma2=np.array([
-[1,0,0,0,0,0],
-[0,1,0,0,0,0],
-[0,0,1,0,0,0],
-[0,0,1,1,0,0],
-[0,0,1,1,1,0],
-[0,0,1,1,1,1],
-]) 	
-results2 = mc_problem.solve(initial_sigma2,initial_pi,optimization=tighter_bfgs,method='1s')
-#results2                                                                                                                                                                                             
-# Problem Results Summary:
-# =======================================================================================================
-# GMM   Objective  Gradient      Hessian         Hessian     Clipped  Weighting Matrix  Covariance Matrix
-# Step    Value      Norm    Min Eigenvalue  Max Eigenvalue  Shares   Condition Number  Condition Number 
-# ----  ---------  --------  --------------  --------------  -------  ----------------  -----------------
-#  1    +3.8E+02   +8.1E-06     +4.3E+00        +3.2E+03        0         +1.1E+04          +5.2E+08     
-# =======================================================================================================
-
-# Cumulative Statistics:
-# ===========================================================================
-# Computation  Optimizer  Optimization   Objective   Fixed Point  Contraction
-#    Time      Converged   Iterations   Evaluations  Iterations   Evaluations
-# -----------  ---------  ------------  -----------  -----------  -----------
-#  00:41:55       Yes          68           83        10653758     32213280  
-# ===========================================================================
-
-# Nonlinear Coefficient Estimates (Robust SEs in Parentheses):
-# ==================================================================================================================================================================================================
-# Sigma:       1         prices       prom      tylenol      advil       bayer     |  Sigma Squared:      1         prices       prom      tylenol      advil       bayer     |    Pi:      income  
-# -------  ----------  ----------  ----------  ----------  ----------  ----------  |  --------------  ----------  ----------  ----------  ----------  ----------  ----------  |  -------  ----------
-#    1      +2.7E-01                                                               |        1          +7.5E-02    +0.0E+00    +0.0E+00    +0.0E+00    +0.0E+00    +0.0E+00   |     1      +0.0E+00 
-#          (+1.8E+00)                                                              |                  (+9.9E-01)  (+0.0E+00)  (+0.0E+00)  (+0.0E+00)  (+0.0E+00)  (+0.0E+00)  |                     
-#                                                                                  |                                                                                          |                     
-# prices    +0.0E+00    +1.4E+00                                                   |      prices       +0.0E+00    +2.0E+00    +0.0E+00    +0.0E+00    +0.0E+00    +0.0E+00   |  prices    +3.2E-01 
-#                      (+3.7E-01)                                                  |                  (+0.0E+00)  (+1.1E+00)  (+0.0E+00)  (+0.0E+00)  (+0.0E+00)  (+0.0E+00)  |           (+2.7E-01)
-#                                                                                  |                                                                                          |                     
-#  prom     +0.0E+00    +0.0E+00    +3.4E-01                                       |       prom        +0.0E+00    +0.0E+00    +1.1E-01    +2.6E+00    +1.4E+00    -2.0E+00   |   prom     +0.0E+00 
-#                                  (+3.0E+00)                                      |                  (+0.0E+00)  (+0.0E+00)  (+2.0E+00)  (+2.3E+01)  (+1.2E+01)  (+1.8E+01)  |                     
-#                                                                                  |                                                                                          |                     
-# tylenol   +0.0E+00    +0.0E+00    +7.8E+00    -5.9E+00                           |     tylenol       +0.0E+00    +0.0E+00    +2.6E+00    +9.5E+01    +6.5E+01    -8.4E+01   |  tylenol   +0.0E+00 
-#                                  (+3.4E+00)  (+3.9E+00)                          |                  (+0.0E+00)  (+0.0E+00)  (+2.3E+01)  (+6.4E+01)  (+7.5E+01)  (+3.8E+01)  |                     
-#                                                                                  |                                                                                          |                     
-#  advil    +0.0E+00    +0.0E+00    +4.1E+00    -5.6E+00    +1.3E+00               |      advil        +0.0E+00    +0.0E+00    +1.4E+00    +6.5E+01    +5.0E+01    -6.5E+01   |   advil    +0.0E+00 
-#                                  (+9.1E+00)  (+5.0E+00)  (+6.4E+00)              |                  (+0.0E+00)  (+0.0E+00)  (+1.2E+01)  (+7.5E+01)  (+8.2E+01)  (+5.7E+01)  |                     
-#                                                                                  |                                                                                          |                     
-#  bayer    +0.0E+00    +0.0E+00    -5.9E+00    +6.4E+00    -3.6E+00    +5.8E+00   |      bayer        +0.0E+00    +0.0E+00    -2.0E+00    -8.4E+01    -6.5E+01    +1.2E+02   |   bayer    +0.0E+00 
-#                                  (+4.8E+00)  (+3.4E+00)  (+2.4E+00)  (+3.1E+00)  |                  (+0.0E+00)  (+0.0E+00)  (+1.8E+01)  (+3.8E+01)  (+5.7E+01)  (+1.1E+02)  |                     
-# ==================================================================================================================================================================================================
-
-# Beta Estimates (Robust SEs in Parentheses):
-# ==========================================================
-#   prices       prom      tylenol      advil       bayer   
-# ----------  ----------  ----------  ----------  ----------
-#  -7.1E+00    -2.1E+00    -8.7E+00    -5.9E+00    -1.5E+01 
-# (+3.2E+00)  (+2.2E-01)  (+5.7E+00)  (+7.6E+00)  (+7.6E+00)
 # ==========================================================
