@@ -42,17 +42,23 @@ drop s w mkt_id
 gen mktshare = sales/count
 
 bysort mkt: egen inside = total(mktshare)
+sum inside
+/* check that share of inside good is always between 0 and 1
+    Variable |        Obs        Mean    Std. dev.       Min        Max
+-------------+---------------------------------------------------------
+      inside |     38,544    .0061503    .0017557   .0005391   .0147917
+*/
 bysort mkt: gen outside = 1 - inside
 
 gen y = log(mktshare) - log(outside)
 local model_1 prom
 local model_2 prom tylenol advil bayer
-local model_3 prom tylenol#i.store advil#i.store bayer#i.store i.store
-*local model_4 prom tylenol advil bayer tylenol#i.store advil#i.store bayer#i.store i.store (results identical to 3)
+local model_3 prom tylenol advil bayer tylenol#i.store advil#i.store bayer#i.store
+*local model_4 prom tylenol#i.store advil#i.store bayer#i.store i.store (results identical to 3)
 
 * Questions 1 to 3 (OLS/Logit model)
 forvalues m = 1/3{
-	quietly reg y price `model_`m''
+	quietly reg y price `model_`m'', noconstant
 	outreg2 using PS1Q1, append
 }
 
@@ -74,25 +80,19 @@ quietly {
 }
 
 forvalues m = 1/3{
-	quietly ivregress 2sls y `model_`m'' (price = cost)
+	quietly ivregress 2sls y `model_`m'' (price = cost), noconstant
 	outreg2 using PS1Q1, append
 }
 
 forvalues m = 1/3{
-	quietly ivregress 2sls y `model_`m'' (price = hausmanprice)
+	quietly ivregress 2sls y `model_`m'' (price = hausmanprice), noconstant
 	outreg2 using PS1Q1, append
 }
-
+/*
 * Question 6 (own-price elasticities from analytic formula)
-gen a_1 = -0.139
-gen a_2 = -0.387
-gen a_3 = -0.387
-gen a_4 = -0.0813
-gen a_5 = -0.359
-gen a_6 = -0.360
-gen a_7 = -0.141
-gen a_8 = -0.405
-gen a_9 = -0.405
+gen a_1 = -1.623
+gen a_2 = -1.645
+gen a_3 = -0.419
 
 forvalues m = 1/9 {
 	gen eta_`m' = a_`m'*price*(1-mktshare)
@@ -106,29 +106,5 @@ label define brand1 0 "store brand" 1 "tylenol" 2 "advil" 3 "bayer"
 label values brand brand1
 
 tabstat eta_*, stat(median) by(brand) nototal
-/*
-Summary statistics: p50
-Group variable: brand 
-
-      brand |     eta_1     eta_2     eta_3     eta_4     eta_5     eta_6     eta_7     eta_8     eta_9
-------------+------------------------------------------------------------------------------------------
-store brand | -.2765646 -.7700037 -.7700037 -.1617605 -.7142928 -.7162825  -.280544 -.8058178 -.8058178
-    tylenol | -.6833545 -1.902577 -1.902577 -.3996886 -1.764923 -1.769839 -.6931869 -1.991069 -1.991069
-      advil | -.7349775 -2.046304 -2.046304 -.4298825 -1.898251 -1.903539 -.7455528 -2.141481 -2.141481
-      bayer | -.4850911 -1.350578 -1.350578  -.283726 -1.252861 -1.256351 -.4920709 -1.413395 -1.413395
--------------------------------------------------------------------------------------------------------
-*/
 
 tabstat eta_*, stat(mean) by(brand) nototal
-/*
-Summary statistics: Mean
-Group variable: brand 
-
-      brand |     eta_1     eta_2     eta_3     eta_4     eta_5     eta_6     eta_7     eta_8     eta_9
-------------+------------------------------------------------------------------------------------------
-store brand | -.2883863 -.8029173 -.8029173 -.1686749 -.7448251 -.7468998 -.2925358 -.8402623 -.8402623
-    tylenol | -.7079446  -1.97104  -1.97104 -.4140712 -1.828432 -1.833526 -.7181308 -2.062716 -2.062716
-      advil | -.7017934 -1.953914 -1.953914 -.4104734 -1.812546 -1.817595 -.7118912 -2.044794 -2.044794
-      bayer | -.5065942 -1.410446 -1.410446  -.296303 -1.308398 -1.312043 -.5138834 -1.476048 -1.476048
--------------------------------------------------------------------------------------------------------
-*/
