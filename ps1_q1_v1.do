@@ -37,6 +37,9 @@ egen mkt_id = concat(s store w week)
 egen mkt = group(mkt_id)
 drop s w mkt_id
 
+* set store 9 in week 10 as the base market: "store 0"
+replace store=0 if store==9 & week==10
+
 * Market size = count
 * calculate market share based on normalized sales
 gen mktshare = sales/count
@@ -53,7 +56,7 @@ bysort mkt: gen outside = 1 - inside
 gen y = log(mktshare) - log(outside)
 local model_1 prom
 local model_2 prom tylenol advil bayer
-local model_3 prom tylenol advil bayer tylenol#i.store advil#i.store bayer#i.store
+local model_3 prom tylenol#i.store advil#i.store bayer#i.store
 *local model_4 prom tylenol#i.store advil#i.store bayer#i.store i.store (results identical to 3)
 
 * Questions 1 to 3 (OLS/Logit model)
@@ -90,11 +93,10 @@ forvalues m = 1/3{
 }
 /*
 * Question 6 (own-price elasticities from analytic formula)
-gen a_1 = -1.623
-gen a_2 = -1.645
-gen a_3 = -0.419
-
-forvalues m = 1/9 {
+gen a_1 = -
+gen a_2 = -
+gen a_3 = -
+forvalues m = 1/3 {
 	gen eta_`m' = a_`m'*price*(1-mktshare)
 }
 drop a_*
@@ -104,7 +106,5 @@ replace brand = 2 if advil==1
 replace brand = 3 if bayer==1
 label define brand1 0 "store brand" 1 "tylenol" 2 "advil" 3 "bayer"
 label values brand brand1
-
 tabstat eta_*, stat(median) by(brand) nototal
-
 tabstat eta_*, stat(mean) by(brand) nototal
