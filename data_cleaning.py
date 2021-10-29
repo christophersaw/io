@@ -18,12 +18,12 @@ df['branded_product']=0
 df.loc[df['brand'].isin([1,2,3,4,5,6,7,8,9]), 'branded_product']=1
 
 # Market ids, market shares
-df['market']=df.groupby(['store','week']).ngroup()								# numeric identifier
-df['market_ids']=df['store'].astype(str)+str('x')+df['week'].astype(str)		# string identifier
+df['market']=df.groupby(['store','week']).ngroup()
+df['market_ids']=df['store'].astype(str)+str('x')+df['week'].astype(str)
 df['shares']=df['sales']/df['count']
  
 # Calculate inside and outside shares
-df['insideshare']=df.groupby(['market'])['shares'].transform('sum')				# checked that insideshares are between 0 and 1
+df['insideshare']=df.groupby(['market'])['shares'].transform('sum')
 df['outsideshare']=df['insideshare'].apply(lambda x: 1-x)
 
 # Merge instruments
