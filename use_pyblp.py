@@ -3,27 +3,23 @@ import pandas as pd
 import numpy as np
 import pyblp
 os.chdir("/Users/christophersaw/Desktop/blp")
-data=pd.read_csv(r'headache.csv')
+df=pd.read_csv(r'headache.csv')
+df2=pd.read_csv(r'headache_instr.csv')
 
-# Rename columns for pyblp syntax
-data=data.rename(columns={'price': 'prices'})
-data=data.rename(columns={'cost': 'demand_instruments0',
-'pricestore1': 'demand_instruments1','pricestore2': 'demand_instruments2','pricestore3': 'demand_instruments3','pricestore4': 'demand_instruments4',
-'pricestore5': 'demand_instruments5','pricestore6': 'demand_instruments6','pricestore7': 'demand_instruments7','pricestore8': 'demand_instruments8',
-'pricestore9': 'demand_instruments9','pricestore10': 'demand_instruments10','pricestore11': 'demand_instruments11','pricestore12': 'demand_instruments12',
-'pricestore13': 'demand_instruments13','pricestore14': 'demand_instruments14','pricestore15': 'demand_instruments15','pricestore16': 'demand_instruments16',
-'pricestore17': 'demand_instruments17','pricestore18': 'demand_instruments18','pricestore19': 'demand_instruments19','pricestore20': 'demand_instruments20',
-'pricestore21': 'demand_instruments21','pricestore22': 'demand_instruments22','pricestore23': 'demand_instruments23','pricestore24': 'demand_instruments24',
-'pricestore25': 'demand_instruments25','pricestore26': 'demand_instruments26','pricestore27': 'demand_instruments27','pricestore28': 'demand_instruments28',
-'pricestore29': 'demand_instruments29','pricestore30': 'demand_instruments30', 'avoutprice': 'demand_instruments31'})
+# Rename columns (prices and demand_instruments) for pyblp syntax, merge dataframes
+df=df.rename(columns={'price': 'prices'})
+list1=['store','week','brand','demand_instruments0','demand_instruments1']
+list2=['demand_instruments'+str(i) for i in range(2,32)]
+del(df2['weight'])
+col_list=list1+list2
+df2.columns=col_list
+data=pd.merge(df, df2, on=['store','week','brand']) # this is a one-one merge
 
 # Load demographic data and reshape for pyblp (each row is an agent in market t)
 incdata=pd.read_csv(r'OTCDemographics.csv',sep='\t')
 incdata['market_ids']=incdata['store'].astype(str)+str('x')+incdata['week'].astype(str)
-incdata=pd.melt(incdata, id_vars=['market_ids'], value_vars=[
-	'hhincome1','hhincome2','hhincome3','hhincome4','hhincome5','hhincome6','hhincome7','hhincome8','hhincome9','hhincome10',
-	'hhincome11','hhincome12','hhincome13','hhincome14','hhincome15','hhincome16','hhincome17','hhincome18','hhincome19','hhincome20'], 
-	var_name='agent_index', value_name='income')
+incdata=pd.melt(incdata, id_vars=['market_ids'],value_vars=['hhincome'+str(i) for i in range(1,21)],var_name='agent_index',value_name='income')
+del(incdata['agent_index'])
 
 # Configure pyblp
 pyblp.options.digits=2
