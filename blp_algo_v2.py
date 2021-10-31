@@ -87,35 +87,55 @@ Z=iv.to_numpy()
 # Weighting matrix [Z'Z]^(-1)
 omega = np.linalg.inv( Z.transpose() @ Z )
 
-# Contraction mapping
+# Calculate mean utility, for any given theta2
 def delta(theta2):
-    # Build arrays
-    predicted_shares=np.zeros((nj,nt))
+    # Set problem parameters
+    x=0
+    maxiter=1000
+    diff=1
+    epsilon=1e-05
+    # Define arrays
     num=np.zeros((nj,nt,ns))
     den=np.zeros((nj,nt,ns)) # take average of num/den along axis 2 to calculate integral numerically
-    # Contraction mapping to get deltas
-    maxiter=100
-    diff=1
-    tol=1e-06
     w_h=np.zeros((nj,nt,maxiter))
-    w_h[:,:,0]=np.exp(np.log(shares)-np.log(outsideshare)) # Initial delta are values that solve the logit model
-    x=0
-    while diff > tol and x < maxiter:
+    w_h[:,:,0]=np.exp(np.log(shares)-np.log(outsideshare)) # w_init = exp(delta_init); delta_init = log(shares)-log(outsideshare) from logit model
+    while diff > epsilon and x < maxiter:
         delta_h=np.log(w_h[:,:,x])
         for i in range(ns):
             num[:,:,i]=np.exp(delta_h[:,:]+theta2[0]*nu[:,:,i]+theta2[1]*inc[:,:,i]*price[:,:])
-            den[:,:,i]=np.sum(num[j,:,i] for j in range(nj)) +1
+            den[:,:,i]=np.sum(num[j,:,i] for j in range(nj)) + 1
         predicted_shares=np.mean(np.divide(num,den),axis=2)
-        w_h[:,:,x+1]=np.multiply(w_h[:,:,x],np.divide(shares,predicted_shares))
+        w_h[:,:,x+1]=np.multiply(w_h[:,:,x],np.divide(shares,predicted_shares)) # w_h+1 = w_h * (shares/predicted_shares), where w = exp(delta)
         diff=np.linalg.norm(shares - predicted_shares)
         x=x+1
     return np.log(w_h[:,:,x]).flatten('F').transpose()
 
+# GMM objective function
 def gmmobjfn(theta2):
     gmmobjfn=(delta(theta2) - X1 @ (np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta(theta2))).transpose() @ Z @ omega @ Z.transpose() @(delta(theta2) - X1 @ (np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta(theta2)))
     return gmmobjfn
+# Notes: for given theta2, delta(theta2) returns the mean utilities "delta". From there, we:
+# (1) Recover theta1 (linear parameters): theta1 = np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta
+# (2) Recover ksi_j (structural residuals): ksi=delta - X1 @ theta1
+# The GMM objective function is "ksi.transpose() @ Z @ omega @ Z.transpose() @ksi"; use (1) and (2) and we get the mess above.
 
-theta2=np.array([[1],       #sigma_b
-                 [1]])      #sigma_i
+# Set intital guess and solve
+theta2=np.array([[0.001],       #sigma_b
+                 [0.001]])      #sigma_i
+results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead',tol=1e-05)
+# results
+# final_simplex: (array([[0.00102878, 0.00098175],
+#        [0.00102878, 0.00098175],
+#        [0.00102878, 0.00098175]]), array([2.42408725e+08, 2.42408725e+08, 2.42408725e+08]))
+#            fun: 242408724.97563094
+#        message: 'Optimization terminated successfully.'
+#           nfev: 217
+#            nit: 80
+#         status: 0
+#        success: True
+#              x: array([0.00102878, 0.00098175])
+theta2_soln=results.x
+delta=delta(theta2_soln)
+theta1_soln=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta
 
-results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead',return_all=True)
+
