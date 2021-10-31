@@ -67,10 +67,10 @@ X2=x2.to_numpy()
 iv=pd.read_csv(r'headache_instr.csv')
 iv=iv.sort_values(by=['store','week','brand'])
 del(iv['store'],iv['week'],iv['brand'],iv['weight'])
-iv=pd.merge(iv, x1,left_index=True,right_index=True)
-del(iv['price'])
-iv=pd.merge(iv, x2,left_index=True,right_index=True)
-del(iv['price'])
+# iv=pd.merge(iv, x1,left_index=True,right_index=True)
+# del(iv['price'])
+# iv=pd.merge(iv, x2,left_index=True,right_index=True)
+# del(iv['price'])
 # list(iv)
 # ['cost', 'avoutprice', 
 # 'pricestore1', 'pricestore2', 'pricestore3', 'pricestore4', 'pricestore5', 
@@ -78,10 +78,7 @@ del(iv['price'])
 # 'pricestore11', 'pricestore12', 'pricestore13', 'pricestore14', 'pricestore15', 
 # 'pricestore16', 'pricestore17', 'pricestore18', 'pricestore19', 'pricestore20', 
 # 'pricestore21', 'pricestore22', 'pricestore23', 'pricestore24', 'pricestore25', 
-# 'pricestore26', 'pricestore27', 'pricestore28', 'pricestore29', 'pricestore30', 
-# 'brand_1', 'brand_2', 'brand_3', 'brand_4', 'brand_5', 
-# 'brand_6', 'brand_7', 'brand_8', 'brand_9', 'brand_10', 'brand_11', 
-# 'prom', 'branded_product']
+# 'pricestore26', 'pricestore27', 'pricestore28', 'pricestore29', 'pricestore30']
 Z=iv.to_numpy()
 
 # Weighting matrix [Z'Z]^(-1)
@@ -122,7 +119,7 @@ def gmmobjfn(theta2):
 # Set intital guess and solve
 theta2=np.array([[0.001],       #sigma_b
                  [0.001]])      #sigma_i
-results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead',tol=1e-05)
+results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead')
 # results
 # final_simplex: (array([[0.00102878, 0.00098175],
 #        [0.00102878, 0.00098175],
@@ -137,5 +134,25 @@ results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead',tol=1e-05)
 theta2_soln=results.x
 delta=delta(theta2_soln)
 theta1_soln=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta
-
+theta1_soln=pd.DataFrame(theta1_soln)
+theta2_soln=pd.DataFrame(theta2_soln)
+# theta1_soln                                                                                                                                                                             
+#             0
+# 0  -11.827211
+# 1   -6.148290
+# 2  -12.192010
+# 3   -8.481754
+# 4   -5.156733
+# 5   -5.269628
+# 6  -10.380751
+# 7  -10.341570
+# 8  -11.638238
+# 9  -14.009262
+# 10  -6.813971
+# 11   0.681785
+# 12  -0.382189
+# theta2_soln                                                                                                                                                                             
+#           0
+# 0 -0.142894
+# 1  0.053953
 
