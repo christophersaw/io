@@ -218,12 +218,17 @@ for j in range(11):
     for k in range(11):
         cross[j,k]=eta[j,k]*shares[j]*price[k]
 
+# Derive marginal costs from FOC
 marginalcosts=price + np.linalg.inv(np.multiply(own,cross)) @ shares
 marginalcosts=pd.DataFrame(marginalcosts)
+
+# Compare with wholesale costs (adjusted for quantitites)
 wholesalecosts=data2['cost'].reset_index()
 del(wholesalecosts['index'])
 compare=marginalcosts.join(wholesalecosts)
-#compare.round(2).to_csv("cost_comparison.csv",index=False)
+compare.columns=['Marginal Costs','Wholesale Costs']
+compare.index=brandlist
+compare.round(4).to_csv("cost_comparison.csv")
 
 
 # PART FOUR: MERGER ANALYSIS
