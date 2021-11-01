@@ -188,7 +188,7 @@ for j in range(11):
             eta[j,k] = (price[k]/shares[j])*(np.mean(alpha*prob[:,j]*prob[:,k]))
 
 elasticities=pd.DataFrame(eta)
-elasticities.round(4).to_csv('elasticities_rc.csv')
+elasticities.round(4).to_csv('elasticities_rc.csv',index=False)
 
 # Cross- and own- elasticities from Logit Model
 eta_logit=np.zeros((11,11))
@@ -200,4 +200,65 @@ for j in range(11):
             eta_logit[j,k] = (-1)*alpha_logit*price[k]*(shares[k])
 
 elasticities_logit=pd.DataFrame(eta_logit)
-elasticities_logit.round(4).to_csv('elasticities_logit.csv')
+elasticities_logit.round(4).to_csv('elasticities_logit.csv',index=False)
+
+
+# PART THREE: MARGINAL COSTS
+
+# Ownership matrix: element (j,k) = 1 if j and k belong to the same company
+# For this part assume that each brand is owned by a single company (i.e. 11 brands = 11 companies)
+own=np.diag(np.ones(11))
+
+# Cross-derivatives: eta_jk = (ds_j/dp_k)*(p_k/s_j)
+cross=np.zeros((11,11))
+for j in range(11):
+    for k in range(11):
+        cross[j,k]=eta[j,k]*shares[j]*price[k]
+
+marginalcosts=price + np.linalg.inv(np.multiply(own,cross)) @ shares
+marginalcosts=pd.DataFrame(marginalcosts)
+wholesalecosts=data2['cost'].reset_index()
+del(wholesalecosts['index'])
+compare=marginalcosts.join(wholesalecosts)
+compare.round(2).to_csv("cost_comparison.csv",index=False)
+
+
+# PART FOUR: MERGER ANALYSIS
+
+#eta=pd.read_csv(r'elasticities.csv').to_numpy()
+#eta_logit=pd.read_csv(r'elasticities_logit.csv').to_numpy()
+
+# # Ownership matrix: element (j,k) = 1 if j and k belong to the same company
+# For this part assume that:
+# Pre-merger: Tylenol owns brands 1 to 3, Advil owns brands 4 to 6, and Bayer owns brands 7 to 9
+# Post-merger: one company owns brands 1 to 9
+own_pre=np.zeros((11,11))
+for i in range(0,3):
+    for j in range(0+(3*i),3+(3*i)):
+        for k in range(0+(3*i),3+(3*i)):
+            own_pre[j,k]=1
+
+for i in range(9,11):
+    own_pre[i,i]=1
+
+own_post=np.zeros((11,11))
+for j in range(0,9):
+    for k in range(0,9):
+        own_post[j,k]=1
+
+for i in range(9,11):
+    own_post[i,i]=1
+
+# Cross-derivatives from logit model: eta_logit_jk = (ds_j/dp_k)*(p_k/s_j)
+cross_logit=np.zeros((11,11))
+for j in range(11):
+    for k in range(11):
+        cross_logit[j,k]=eta_logit[j,k]*shares[j]*price[k]
+
+marginalcosts_pre=price + np.linalg.inv(np.multiply(own_pre,cross_logit)) @ shares
+price_post=marginalcosts_pre - np.linalg.inv(np.multiply(own_post,cross_logit)) @ shares
+price_increase=np.divide(price_post,price)
+price_increase=pd.DataFrame(price_increase)
+price_post=pd.DataFrame(price_post).merge(price_increase, left_index=True, right_index=True)
+price=pd.DataFrame(price).merge(price_post, left_index=True, right_index=True)
+price.to_csv('predicted_prices.csv',index=False)
