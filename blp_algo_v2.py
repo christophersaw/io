@@ -121,16 +121,16 @@ theta2=np.array([[0.001],       #sigma_b
                  [0.001]])      #sigma_i
 results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead')
 # results
-# final_simplex: (array([[0.00102878, 0.00098175],
-#        [0.00102878, 0.00098175],
-#        [0.00102878, 0.00098175]]), array([2.42408725e+08, 2.42408725e+08, 2.42408725e+08]))
-#            fun: 242408724.97563094
-#        message: 'Optimization terminated successfully.'
-#           nfev: 217
-#            nit: 80
-#         status: 0
-#        success: True
-#              x: array([0.00102878, 0.00098175])
+# final_simplex: (array([[0.96555413, 0.06534052],
+#       [0.96555725, 0.06534666],
+#       [0.96545499, 0.06534592]]), array([10.31220724, 10.31220725, 10.31220726]))
+#           fun: 10.312207242007293
+#       message: 'Optimization terminated successfully.'
+#          nfev: 130
+#           nit: 69
+#        status: 0
+#       success: True
+#             x: array([0.96555413, 0.06534052])
 theta2_soln=results.x
 delta=delta(theta2_soln)
 theta1_soln=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta
@@ -138,21 +138,21 @@ theta1_soln=pd.DataFrame(theta1_soln)
 theta2_soln=pd.DataFrame(theta2_soln)
 # theta1_soln                                                                                                                                                                             
 #             0
-# 0  -11.827211
-# 1   -6.148290
-# 2  -12.192010
-# 3   -8.481754
-# 4   -5.156733
-# 5   -5.269628
-# 6  -10.380751
-# 7  -10.341570
-# 8  -11.638238
-# 9  -14.009262
-# 10  -6.813971
-# 11   0.681785
-# 12  -0.382189
+# 0  -13.225776
+# 1   -7.135449
+# 2  -14.043093
+# 3   -9.339518
+# 4   -6.625406
+# 5   -6.021728
+# 6  -11.244988
+# 7  -11.472647
+# 8  -10.983177
+# 9  -14.822047
+# 10  -6.922914
+# 11   0.692380
+# 12  -0.379713
 # theta2_soln                                                                                                                                                                             
 #           0
-# 0 -0.142894
-# 1  0.053953
+# 0  0.965554
+# 1  0.065341
 
