@@ -36,6 +36,13 @@ price=price.join(data['brand'])
 price=price.pivot(index='brand',columns='market',values='price')
 price=price.to_numpy()
 
+# Branded Product dummy
+branded=pd.DataFrame(data['branded_product'])
+branded=branded.join(data['market'])
+branded=branded.join(data['brand'])
+branded=branded.pivot(index='brand',columns='market',values='branded_product')
+branded=branded.to_numpy()
+
 # Income (nj x nt x ns)
 d=pd.read_csv(r'OTCDemographics.csv',sep='\t')
 d=d.sort_values(by=['store','week'])
@@ -99,7 +106,7 @@ def delta(theta2):
     while diff > epsilon and x < maxiter:
         delta_h=np.log(w_h[:,:,x])
         for i in range(ns):
-            num[:,:,i]=np.exp(delta_h[:,:]+theta2[0]*nu[:,:,i]+theta2[1]*inc[:,:,i]*price[:,:])
+            num[:,:,i]=np.exp(delta_h[:,:]+theta2[0]*nu[:,:,i]*branded[:,:]+theta2[1]*inc[:,:,i]*price[:,:])
             den[:,:,i]=np.sum(num[j,:,i] for j in range(nj)) + 1
         predicted_shares=np.mean(np.divide(num,den),axis=2)
         w_h[:,:,x+1]=np.multiply(w_h[:,:,x],np.divide(shares,predicted_shares)) # w_h+1 = w_h * (shares/predicted_shares), where w = exp(delta)
@@ -121,16 +128,16 @@ theta2=np.array([[0.001],       #sigma_b
                  [0.001]])      #sigma_i
 results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead')
 # results
-# final_simplex: (array([[0.96555413, 0.06534052],
-#       [0.96555725, 0.06534666],
-#       [0.96545499, 0.06534592]]), array([10.31220724, 10.31220725, 10.31220726]))
-#           fun: 10.312207242007293
+# final_simplex: (array([[-0.27854442,  0.04899133],
+#       [-0.27860998,  0.04899912],
+#       [-0.27845884,  0.04900023]]), array([11.50313971, 11.50313971, 11.50313973]))
+#           fun: 11.503139705392927
 #       message: 'Optimization terminated successfully.'
-#          nfev: 130
-#           nit: 69
+#          nfev: 139
+#           nit: 72
 #        status: 0
 #       success: True
-#             x: array([0.96555413, 0.06534052])
+#             x: array([-0.27854442,  0.04899133])
 theta2_soln=results.x
 delta=delta(theta2_soln)
 theta1_soln=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta
@@ -138,21 +145,21 @@ theta1_soln=pd.DataFrame(theta1_soln)
 theta2_soln=pd.DataFrame(theta2_soln)
 # theta1_soln                                                                                                                                                                             
 #             0
-# 0  -13.225776
-# 1   -7.135449
-# 2  -14.043093
-# 3   -9.339518
-# 4   -6.625406
-# 5   -6.021728
-# 6  -11.244988
-# 7  -11.472647
-# 8  -10.983177
-# 9  -14.822047
-# 10  -6.922914
-# 11   0.692380
-# 12  -0.379713
-# theta2_soln                                                                                                                                                                             
+# 0  -12.086905
+# 1   -6.471710
+# 2  -12.487131
+# 3   -8.659687
+# 4   -5.361192
+# 5   -5.494671
+# 6  -10.602938
+# 7  -10.483532
+# 8  -11.362179
+# 9  -14.005194
+# 10  -6.816987
+# 11   0.657570
+# 12  -0.293241
+# theta2_soln
 #           0
-# 0  0.965554
-# 1  0.065341
+# 0 -0.278544
+# 1  0.048991
 
