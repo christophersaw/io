@@ -94,8 +94,8 @@ def delta(theta2):
 # GMM objective function
 def gmmobjfn(theta2):
     theta1=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta(theta2) # (1) Recover theta1 (linear parameters)
-    ksi=delta(theta2) - X1 @ theta1 # (2) Recover ksi_j (structural residuals)
-    gmmobjfn=ksi.transpose() @ Z @ omega @ Z.transpose() @ksi # GMM objective function
+    xi=delta(theta2) - X1 @ theta1 # (2) Recover xi_j (structural residuals)
+    gmmobjfn=xi.transpose() @ Z @ omega @ Z.transpose() @xi # GMM objective function
     return gmmobjfn
 
 # Set intital guess and solve

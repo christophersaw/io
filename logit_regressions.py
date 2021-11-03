@@ -17,8 +17,7 @@ data['y']=data['log_share']-data['log_outside']
 
 # Create categorical variables
 data['brand_dummies']=data['brand'].astype('category')
-data['store_brand_dummies']=data['brand']*data['store']
-data['store_brand_dummies']=data['store_brand_dummies'].astype('category')
+data['store_brand_dummies']=data.groupby(['store','brand']).ngroup().astype('category')
 
 # Create average hausman price instrument
 data['total_price']=data.groupby(['brand'])['price'].transform('sum')
@@ -120,12 +119,12 @@ data['eta9']=data['alpha9']*data['price']*(1-data['shares'])
 
 data['eta1'].mean() # -6.72
 data['eta2'].mean() # -4.68
-data['eta3'].mean() # -1.05
+data['eta3'].mean() # -2.20
 
-data['eta4'].mean() # -10.5
-data['eta5'].mean() # 0.514
-data['eta6'].mean() # 1.39
+data['eta4'].mean() #
+data['eta5'].mean() #
+data['eta6'].mean() #
 
-data['eta7'].mean() # -10.3
-data['eta8'].mean() # 0.513
-data['eta9'].mean() # 1.23
+data['eta7'].mean() #
+data['eta8'].mean() #
+data['eta9'].mean() #

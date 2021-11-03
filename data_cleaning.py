@@ -21,7 +21,7 @@ df.loc[df['brand'].isin([1,2,3,4,5,6,7,8,9]), 'branded_product']=1
 df['market']=df.groupby(['store','week']).ngroup()
 df['market_ids']=df['store'].astype(str)+str('x')+df['week'].astype(str)
 df['shares']=df['sales']/df['count']
- 
+
 # Calculate inside and outside shares
 df['insideshare']=df.groupby(['market'])['shares'].transform('sum')
 df['outsideshare']=df['insideshare'].apply(lambda x: 1-x)
@@ -33,12 +33,13 @@ df.sort_values(by=['store','week']).to_csv('headache.csv',index=False)
 df2=pd.read_csv(r'OTCDataInstruments.csv',sep='\t')
 df2=df2.sort_values(by=['store','week','brand'])
 
-# Re-weight Hausman Prices
+# Re-weight IVs
 df2.columns=df2.columns.str.replace('_','')
-df2.loc[df2['brand'].isin([1,4,7]), 'weight']=0.5
-df2.loc[df2['brand'].isin([2,5,8,10]), 'weight']=1
-df2.loc[df2['brand'].isin([3,6,9,11]), 'weight']=2
+df2.loc[df2['brand'].isin([1,4,7]),'weight']=0.5
+df2.loc[df2['brand'].isin([2,5,8,10]),'weight']=1
+df2.loc[df2['brand'].isin([3,6,9,11]),'weight']=2
 df2['cost']=df2['cost']/df2['weight']
+df2['avoutprice']=df2['avoutprice']/df2['weight']
 
 for store in range(1, 31):
 	df2['pricestore'+str(store)] = df2['pricestore'+str(store)]/df2['weight']
