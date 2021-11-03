@@ -21,13 +21,13 @@ df.columns=df.columns.str.replace('_','')
 df.loc[df['brand'].isin([1,4,7]),'weight']=0.5
 df.loc[df['brand'].isin([2,5,8,10]),'weight']=1
 df.loc[df['brand'].isin([3,6,9,11]),'weight']=2
-df['sales']	= df['sales']*df['weight']
-df['price']	= df['price']/df['weight']
-df['cost']	= df['cost']/df['weight']
+df['sales']=df['sales']*df['weight']
+df['price']=df['price']/df['weight']
+df['cost']=df['cost']/df['weight']
 
-# Create categories/dummies for brand, store-brand and branded_product
+# Create categories/dummies for branded_product
 df['branded_product']=0
-df.loc[df['brand'].isin([1,2,3,4,5,6,7,8,9]), 'branded_product']=1
+df.loc[df['brand'].isin([1,2,3,4,5,6,7,8,9]),'branded_product']=1
 
 # Market ids, market shares
 df['market']=df.groupby(['store','week']).ngroup()
@@ -54,7 +54,7 @@ df2['cost']=df2['cost']/df2['weight']
 df2['avoutprice']=df2['avoutprice']/df2['weight']
 
 for store in range(1, 31):
-	df2['pricestore'+str(store)] = df2['pricestore'+str(store)]/df2['weight']
+	df2['pricestore'+str(store)]=df2['pricestore'+str(store)]/df2['weight']
 
 # Save instruments for BLP model
 df2.sort_values(by=['store','week']).to_csv('headache_instr.csv',index=False)
@@ -75,7 +75,7 @@ data['store_brand_dummies']=data.groupby(['store','brand']).ngroup().astype('cat
 
 # Create average hausman price instrument
 data['total_price']=data.groupby(['brand'])['price'].transform('sum')
-data['price_excl_own']=data['total_price'] - data['price']
+data['price_excl_own']=data['total_price']-data['price']
 data['avg_h_price']=data['price_excl_own'].apply(lambda x: x/3503)
 
 # Regressions for Q1.1 to Q1.5
@@ -138,24 +138,16 @@ pystout(models=[model7,model8,model9],
         modstat={'nobs':'Obs','rsquared_adj':'Adj. R\sym{2}'}
         )
 
-pystout(models=[model1,model2,model3,model4,model5,model6,model7,model8,model9],
-        file='LogitAllregressionsv2.tex',
-        digits=2,
-        mgroups={'Logit (OLS)':[1,3],'Logit (IV - Cost)':[4,6],'Logit (IV - Hausman)':[7,9]},
-        modstat={'nobs':'Obs','rsquared_adj':'Adj. R\sym{2}'},
-        addnotes=['Standard errors in parentheses','\sym{**} p\sym{_<}0.01, * p\sym{_<}0.05']
-        )
-
-# Calculate average own-price elasticities from models 1 to 9
+# Calculate average own-price elasticities from models 1 to 3
 data['alpha1']=model1.params[0]
 data['alpha2']=model2.params[0]
 data['alpha3']=model3.params[0]
 data['eta1']=data['alpha1']*data['price']*(1-data['shares'])
 data['eta2']=data['alpha2']*data['price']*(1-data['shares'])
 data['eta3']=data['alpha3']*data['price']*(1-data['shares'])
-data['eta1'].mean() # -6.72
-data['eta2'].mean() # -4.68
-data['eta3'].mean() # -2.20
+data['eta1'].mean()
+data['eta2'].mean()
+data['eta3'].mean()
 
 ### Q2: BLP ###
 
@@ -237,7 +229,7 @@ def delta(theta2):
         delta_h=np.log(w_h[:,:,x])
         for i in range(ns):
             num[:,:,i]=np.exp(delta_h[:,:]+theta2[0]*nu[:,:,i]*branded[:,:]+theta2[1]*inc[:,:,i]*price[:,:])
-            den[:,:,i]=np.sum(num[j,:,i] for j in range(nj)) + 1
+            den[:,:,i]=np.sum(num[j,:,i] for j in range(nj))+1
         predicted_shares=np.mean(np.divide(num,den),axis=2)
         w_h[:,:,x+1]=np.multiply(w_h[:,:,x],np.divide(shares,predicted_shares)) # w_h+1 = w_h * (shares/predicted_shares), where w = exp(delta)
         diff=np.linalg.norm(shares - predicted_shares)
@@ -248,25 +240,24 @@ def delta(theta2):
 def gmmobjfn(theta2):
     theta1=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta(theta2) # (1) Recover theta1 (linear parameters)
     xi=delta(theta2) - X1 @ theta1 # (2) Recover xi_j (structural residuals)
-    gmmobjfn=xi.transpose() @ Z @ omega @ Z.transpose() @xi # GMM objective function
+    gmmobjfn=xi.transpose() @ Z @ omega @ Z.transpose() @ xi # GMM objective function
     return gmmobjfn
 
 # SOLUTION
 # Set intital guess and solve
-theta2=np.array([[0.001],       #sigma_b
-                 [0.001]])      #sigma_i
-results=sp.optimize.minimize(gmmobjfn,theta2,method='Nelder-Mead')
-# results
-# final_simplex: (array([[1.0087855 , 0.05866099],
-#       [1.00886377, 0.05866039],
-#       [1.008784  , 0.058657  ]]), array([8.89916613, 8.89916614, 8.89916614]))
-#           fun: 8.899166132258753
-#       message: 'Optimization terminated successfully.'
-#          nfev: 127
-#           nit: 67
-#        status: 0
-#       success: True
-#             x: array([1.0087855 , 0.05866099])
+theta2_init=np.array([[0.001],       #sigma_b
+                      [0.001]])      #sigma_i
+results=sp.optimize.minimize(gmmobjfn,theta2_init,method='Nelder-Mead')
+ # final_simplex: (array([[0.80524738, 0.04280962],
+ #       [0.80519115, 0.04280575],
+ #       [0.80533614, 0.04279349]]), array([9.52617766, 9.52617767, 9.52617772]))
+ #           fun: 9.526177659088388
+ #       message: 'Optimization terminated successfully.'
+ #          nfev: 122
+ #           nit: 64
+ #        status: 0
+ #       success: True
+ #             x: array([0.80524738, 0.04280962])
 theta2_soln=results.x
 delta=delta(theta2_soln)
 theta1_soln=np.linalg.inv(X1.transpose() @ Z @ omega @ Z.transpose() @ X1) @ X1.transpose() @ Z @ omega @ Z.transpose() @ delta
@@ -276,12 +267,10 @@ list1=["brand_"+str(i) for i in range(1,12)]
 list2=['prom','price']
 theta1.index=list1+list2
 theta1.to_csv('theta1.csv')
-
 theta2=pd.DataFrame(theta2_soln)
 theta2.columns=['X2']
 theta2.index=['sigma_b','sigma_i']
 theta2.to_csv('theta2.csv')
-
 gmmval=results.fun
 
 # PART TWO: MARKET ANALYSIS
@@ -301,7 +290,7 @@ nu=nu_t.loc[0]
 mu=np.zeros((20,11))
 for i in range(20):
     for j in range(11):
-        mu[i,j]=theta2_soln[0]*nu[i]*branded[j] + theta2_soln[1]*inc[i]*price[j]
+        mu[i,j]=theta2_soln[0]*nu[i]*branded[j]+theta2_soln[1]*inc[i]*price[j]
 
 # delta_j (mean utility of product j)
 delta=data2['delta_t'].to_numpy()
@@ -312,7 +301,7 @@ den=np.zeros((20,11))
 for i in range(20):
     for j in range(11):
         num[i,:]=np.exp(delta+mu[i,:])
-        den[i,:]=np.sum(num[i,k] for k in range(11)) + 1
+        den[i,:]=np.sum(num[i,k] for k in range(11))+1
     prob=np.divide(num,den)
 
 # alpha
@@ -325,9 +314,9 @@ eta=np.zeros((11,11))
 for j in range(11):
     for k in range(11):
         if j==k:
-            eta[j,j] = (-1)*(price[j]/shares[j])*(np.mean(alpha*prob[:,j]*(1-prob[:,j])))
+            eta[j,j]=(-1)*(price[j]/shares[j])*(np.mean(alpha*prob[:,j]*(1-prob[:,j])))
         else:
-            eta[j,k] = (price[k]/shares[j])*(np.mean(alpha*prob[:,j]*prob[:,k]))
+            eta[j,k]=(price[k]/shares[j])*(np.mean(alpha*prob[:,j]*prob[:,k]))
 
 elasticities=pd.DataFrame(eta)
 brandlist= ['Tylenol (25)',
@@ -350,9 +339,9 @@ eta_logit=np.zeros((11,11))
 for j in range(11):
     for k in range(11):
         if j==k:
-            eta_logit[j,j] = alpha_logit*price[j]*(1-shares[j])
+            eta_logit[j,j]=alpha_logit*price[j]*(1-shares[j])
         else:
-            eta_logit[j,k] = (-1)*alpha_logit*price[k]*(shares[k])
+            eta_logit[j,k]=(-1)*alpha_logit*price[k]*(shares[k])
 
 elasticities_logit=pd.DataFrame(eta_logit)
 elasticities_logit.columns=brandlist
@@ -370,10 +359,10 @@ own=np.diag(np.ones(11))
 cross=np.zeros((11,11))
 for j in range(11):
     for k in range(11):
-        cross[j,k]=eta[j,k]*shares[j]*price[k]
+        cross[j,k]=eta[j,k]*shares[j]/price[k]
 
 # Derive marginal costs from FOC
-marginalcosts=price + np.linalg.inv(np.multiply(own,cross)) @ shares
+marginalcosts=price+np.linalg.inv(np.multiply(own,cross)) @ shares
 marginalcosts=pd.DataFrame(marginalcosts)
 
 # Compare with wholesale costs (adjusted for quantitites)
@@ -412,13 +401,13 @@ for i in range(9,11):
 cross_logit=np.zeros((11,11))
 for j in range(11):
     for k in range(11):
-        cross_logit[j,k]=eta_logit[j,k]*shares[j]*price[k]
+        cross_logit[j,k]=eta_logit[j,k]*shares[j]/price[k]
 
 # Derive marginal costs from FOC
-marginalcosts_pre=price + np.linalg.inv(np.multiply(own_pre,cross_logit)) @ shares
+marginalcosts_pre=price+np.linalg.inv(np.multiply(own_pre,cross_logit)) @ shares
 
 # Predict post-merger prices using post-merger ownership matrix
-price_post=marginalcosts_pre - np.linalg.inv(np.multiply(own_post,cross_logit)) @ shares
+price_post=marginalcosts_pre-np.linalg.inv(np.multiply(own_post,cross_logit)) @ shares
 
 # Save results
 price_increase=np.divide(price_post,price)
@@ -438,13 +427,13 @@ shares=pd.DataFrame(data2['shares']).join(data2['market']).join(data2['brand']).
 cross=np.zeros((11,11))
 for j in range(11):
     for k in range(11):
-        cross[j,k]=eta[j,k]*shares[j]*price[k]
+        cross[j,k]=eta[j,k]*shares[j]/price[k]
 
 # Derive marginal costs from FOC
-marginalcosts_pre=price + np.linalg.inv(np.multiply(own_pre,cross)) @ shares
+marginalcosts_pre=price+np.linalg.inv(np.multiply(own_pre,cross)) @ shares
 
 # Predict post-merger prices using post-merger ownership matrix
-price_post=marginalcosts_pre - np.linalg.inv(np.multiply(own_post,cross)) @ shares
+price_post=marginalcosts_pre-np.linalg.inv(np.multiply(own_post,cross)) @ shares
 
 # Save results
 price_increase=np.divide(price_post,price)
@@ -455,3 +444,9 @@ price.columns=['Pre-merger price','Post-merger price', 'Percentage Change']
 price['Percentage Change']=(price['Percentage Change']-1)*100
 price.index=brandlist
 price.round(6).to_csv('predicted_prices_rc.csv')
+
+eta_logit_own=pd.DataFrame(np.diag(eta_logit))
+eta_blp_own=pd.DataFrame(np.diag(eta))
+eta_own=eta_logit_own=pd.DataFrame(np.diag(eta_logit)).merge(eta_blp_own, left_index=True, right_index=True)
+eta_own.index=brandlist
+eta_own.to_csv("eta_own.csv")
