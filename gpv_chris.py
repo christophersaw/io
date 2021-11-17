@@ -49,11 +49,8 @@ for i in range(n):
 	v[i]=b[i]+G(b[i],n)/g(b[i],n,h_bids)
 
 
-# Kernel for v
-h_values=1.06*np.std(v)*n**(-0.2)
-
 # Fit KDE and plot f(v)
-sns.distplot(v, hist=False, kde=True, bins=int(n*h_values), color='black')
+sns.distplot(v, hist=True, kde=True, bins=int(10), color='black')
 plt.xlabel('Values')
 plt.ylabel('Density')
 plt.show()
@@ -72,6 +69,8 @@ def f(Y,N,H):
 	kpdf_values = (k/(N*H)) * np.sum( np.exp( (-0.5)*((v-Y)/H)**2 ) )
 	return kpdf_values
 
+# Kernel for v
+h_values=1.06*np.std(v)*n**(-0.2)
 
 fv=np.zeros(n)
 for i in range(n):
