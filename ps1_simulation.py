@@ -67,7 +67,7 @@ log_output=beta_zero+beta_k*log_capital+beta_l*log_labor+omega+err
 output=np.exp(log_output)
 
 # (2g) Path for materials (output prior to measurement error)
-log_materials=log_output-err
+log_materials=log_output-omega-err
 materials=np.exp(log_materials)
 
 # (3) Dataframe for log_output (q_it), log_capital (k_it), 
