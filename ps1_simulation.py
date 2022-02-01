@@ -34,6 +34,7 @@ for t in range(T):
 	omega[:,t+1]=rho*omega[:,t]+xi[:,t] # Productivity path from t=0 to t=50			
 	wage[:,t+1]=theta*wage[:,t]+nu[:,t] # Wage path from t=0 to t=50
 
+
 # (1c) Generate time-invariant investment costs for firms
 sigma_g=np.sqrt(0.6)
 g=np.random.normal(0,sigma_g,(N,1)) # g = log(1/gamma)~N(0,0.6)
@@ -46,11 +47,13 @@ for i in range(N):
 		inv[i,t]=1/gamma[i]*beta_k*np.exp(omega[i,t+1])*\
 		np.power((np.exp(omega[i,t+1])*beta_l/wage[i,t+1]),(beta_l/(1-beta_l)))
 
+
 # (2d) Path for capital from t=0 to t=50 (use equation for capital growth)
 # Assume that every firm begins with 1 unit of capital at t=0
 capital=np.ones((N,T+1)) 									
 for t in range(T):
 	capital[:,t+1]=(1-delta)*capital[:,t]+inv[:,t]
+
 
 log_capital=np.log(capital)
 
@@ -70,18 +73,13 @@ output=np.exp(log_output)
 log_materials=log_output-omega-err
 materials=np.exp(log_materials)
 
-# (3) Dataframe for log_output (q_it), log_capital (k_it), 
-# log_labor (l_it), log_materials (m_it)
-
-# (3) Index for N firms
+# (3) Dataframe for q, k, l, m
+# Index for firm_ids and time periods
 firms=pd.DataFrame(np.linspace(1,N,num=N), columns=["firm_id"])
 firm_id=pd.concat([firms]*51,ignore_index=True)
-
-# (3) Index for T+1 periods
 time=pd.Series(np.linspace(0,T,num=T+1)).repeat(1000)
 time=pd.DataFrame(time, columns=["time"]).reset_index()
-
-# (3) Reshape 'N x (T+1)' matrices into columns of length N*(T+1)
+# Reshape arrays and assemble dataframe
 q_it=pd.DataFrame(log_output.flatten('F'), columns=["log_output"])
 k_it=pd.DataFrame(log_capital.flatten('F'), columns=["log_capital"])
 l_it=pd.DataFrame(log_labor.flatten('F'), columns=["log_labor"])
