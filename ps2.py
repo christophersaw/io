@@ -1,3 +1,5 @@
+caffeinate -is python3
+
 import os
 os.chdir("/Users/christophersaw/Desktop/PS2")
 import pyreadr
@@ -186,20 +188,20 @@ def p_exit(s1,s2,s3):
 
 
 # (3) Forward simulation
-K=2
+K=200
 T=50
 NS=np.shape(S)[0]
 NF=np.shape(S)[1]
 ST=np.zeros((NS,NF,T+1,K))
-X=np.zeros((NS,NF,T+1,K))       # optimal exit decision
+X=np.zeros((NS,NF,T+1,K))
 
-# (3a) Simulate K paths over T periods, each path starting at s0; record any exits
+# (3a) Simulate K paths over T periods, each path starting at s0; record any exits in matrix X
 for k in range(K):
         ST[:,:,0,k]=S
         for t in range(T):
                 for i in range(NS):
                         for j in range(NF):
-                                x1=ST[i,j,t,k]
+                                x1=ST[i,j,t,k] # p_enter and p_exit depends on the ordering of (s1,s2,s3)
                                 if j==0:
                                         x2=ST[i,j+1,t,k]
                                         x3=ST[i,j+2,t,k]
@@ -209,25 +211,51 @@ for k in range(K):
                                 elif j==2:
                                         x2=ST[i,j-2,t,k]
                                         x3=ST[i,j-1,t,k]
-                                if ST[i,j,t,k]==0:        
-                                        if np.random.uniform(0,1) < p_enter(x1,x2,x3):
-                                                ST[i,j,t+1,k]=random.choice(range(1,7))
+                                if x1==0: # if firm j in state i is a potential entrant
+                                        if np.random.uniform(0,1) < p_enter(x1,x2,x3): # chooses whether to enter
+                                                ST[i,j,t+1,k]=random.choice(range(1,7)) # productivity is a random uniform draw
                                         else:
                                                 ST[i,j,t+1,k]=ST[i,j,t,k]
-                                else:
-                                        if ST[i,j,t,k]==np.min(ST[i,:,t,k]):
-                                                if np.random.uniform(0,1) < p_exit(x1,x2,x3):
-                                                        ST[i,j,t+1,k]=0
+                                else: # firm j in state i is an incumbent
+                                        if (x2>0) & (x3>0): # and there are 3 incumbents (elifs consider other cases)
+                                                if x1==np.min((x1,x2,x3)): # lowest productivity firm 
+                                                        if np.random.uniform(0,1) < p_exit(x1,x2,x3): # chooses whether to exit
+                                                                ST[i,j,t+1,k]=0
+                                                                X[i,j,t,k]=1
+                                                        else:
+                                                                ST[i,j,t+1,k]=ST[i,j,t,k]
+                                                else:
+                                                        ST[i,j,t+1,k]=ST[i,j,t,k]
+                                        elif (x2>0) & (x3==0):
+                                                if x1<x2: # lowest productivity firm 
+                                                        if np.random.uniform(0,1) < p_exit(x1,x2,x3): 
+                                                                ST[i,j,t+1,k]=0 
+                                                                X[i,j,t,k]=1
+                                                        else:
+                                                                ST[i,j,t+1,k]=ST[i,j,t,k]
+                                                else:
+                                                        ST[i,j,t+1,k]=ST[i,j,t,k]
+                                        elif (x3>0) & (x2==0):
+                                                if x1<x3: # lowest productivity firm 
+                                                        if np.random.uniform(0,1) < p_exit(x1,x2,x3):
+                                                                ST[i,j,t+1,k]=0
+                                                                X[i,j,t,k]=1
+                                                        else:
+                                                                ST[i,j,t+1,k]=ST[i,j,t,k]
+                                                else:
+                                                        ST[i,j,t+1,k]=ST[i,j,t,k]
+                                        elif (x3==0) & (x2==0):
+                                                if np.random.uniform(0,1) < p_exit(x1,x2,x3): 
+                                                        ST[i,j,t+1,k]=0 
                                                         X[i,j,t,k]=1
                                                 else:
                                                         ST[i,j,t+1,k]=ST[i,j,t,k]
-                                        else:
-                                                ST[i,j,t+1,k]=ST[i,j,t,k]
 
 
 # (3b) Value Function for (3e) each initial state s; for firm i = 1
-def EV(x):
-        Exit=x
+def EV(exit_decision,exit_indicator):
+        Exit=exit_decision
+        Ind=exit_indicator
         beta=0.95
         vt=np.zeros((NS,T+1,K,2)) # per-period profit or exit choice 
         V=np.zeros((NS,K)) # present discounted value, for equation 3
@@ -238,27 +266,69 @@ def EV(x):
                                 x1=ST[i,0,t,k].astype(int)
                                 x2=ST[i,1,t,k].astype(int)
                                 x3=ST[i,2,t,k].astype(int)
-                                vt[i,t,k,0]=np.power(beta,t)*(1-Exit[i,0,t,k])*pi(x1,x2,x3)         
-                                vt[i,t,k,1]=np.power(beta,t)*Exit[i,0,t,k]                          
+                                vt[i,t,k,0]=np.power(beta,t)*(1-Ind[i,0,t,k])*pi(x1,x2,x3) # earn profits up to (& incl) exit period t
+                                vt[i,t,k,1]=np.power(beta,t)*Exit[i,0,t,k] # receive one-time exit value at t
                         V[i,k]=np.sum(vt[i,:,k,0])+np.sum(vt[i,:,k,1]) 
         for i in range(NS):
                 EV[i]=np.mean(V[i,:])
         return EV
 
-# (3c) Generate M perturbations of optimal exit and calculate EV for each m
-M=2
-bracket=[-5,-4,-3,-2,-1,1,2,3,4,5]
-XM=np.zeros((NS,NF,T+1,K,M))
+
+# (3c) Simulated exit strategy
+X1=np.zeros((NS,NF,T+1,K))  # optimal exit decision given initial state s
+XT=np.zeros((NS,NF,T+1,K))  # indicator whether the firm has exited in any t
+for k in range(K):
+        for i in range(NS):
+                for j in range(NF):
+                        for t in range(T):
+                                if np.sum(X1[i,j,:,k])==0:
+                                        X1[i,j,t,k]=X[i,j,t,k]
+                                        XT[i,j,t+1,k]=X[i,j,t,k] # indicator starts in period after exit
+                                else:
+                                        XT[i,j,t+1,k]=1
+
+
+# Generate M perturbations of optimal exit and calculate EV for each m
+M=200
+X1m=np.zeros((NS,NF,T+1,K,M))
+XTm=np.zeros((NS,NF,T+1,K,M))
+EVm=np.zeros((NS,M))
 for m in range(M):
         for k in range(K):
-                for t in range(5,T-4):
-                        if X[i,0,t,k]==1:
-                                tau=t+random.choice(bracket)
-                                XM[i,0,t,k,m]=0
-                                XM[i,0,tau,k,m]=1
+                for i in range(NS):
+                        for t in range(5,T-4):
+                                if X1[i,0,t,k]==1:
+                                        tau=t+random.choice([-5,-4,-3,-2,-1,1,2,3,4,5])
+                                        X1m[i,0,t,k,m]=0
+                                        X1m[i,0,tau,k,m]=1
+                                        XTm[i,0,tau+1,k,m]=1
+                        for t in range(T):
+                                if XTm[i,0,t,k,m]==1:
+                                        XTm[i,0,t+1,k,m]=1
+        x1=X1m[:,:,:,:,m]
+        xt=XTm[:,:,:,:,m]
+        ev=EV(x1,xt)
+        for i in range(NS):
+                EVm[i,m]=ev[i]
 
-EVM=np.zeros((NS,M))
-for m in range(M):
-        x=XM[:,:,:,:,m]
-        EVM[:,m]=EV(x)
+# (3d) Calculate phi(s_0)
+prob_exit=np.zeros((NS,1)) # put p_exit into a NS x 1 vector
+for i in range(NS):
+        prob_exit[i]=p_exit(S[i,0],S[i,1],S[i,2])
 
+phi=np.zeros((NS,1))
+exp_value=EV(X1,XT)
+phi=((1-beta)*exp_value-(1-prob_exit)*pi1)/prob_exit # NS x 1 vector for every initial state
+
+# phi_M=np.zeros((NS,M))
+# for m in range(M):
+#         for i in range(NS):
+#                 phi_M[i,m]=((1-beta)*EVm[i,m]-(1-prob_exit[i])*pi1[i])/prob_exit[i]
+
+# phi_LB=np.zeros((NS,1))
+# phi_UB=np.zeros((NS,1))
+# for i in range(NS):
+#         phi_LB[i]=np.min(phi_M[i,:])
+#         phi_UB[i]=np.max(phi_M[i,:])
+
+# phi_mat=pd.DataFrame(np.concatenate((phi_LB,phi,phi_UB),axis=1))
