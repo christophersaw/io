@@ -11,6 +11,9 @@ from pystout import pystout
 import statsmodels as sm
 from statsmodels.discrete.discrete_model import Probit
 import scipy as sp
+from scipy.optimize import fsolve
+from scipy.optimize import minimize
+from scipy.stats import norm
 from sklearn.preprocessing import PolynomialFeatures
 import random
 import warnings 
@@ -252,29 +255,7 @@ for k in range(K):
                                                         ST[i,j,t+1,k]=ST[i,j,t,k]
 
 
-# (3b) Value Function for (3e) each initial state s; for firm i = 1
-def EV(exit_decision,exit_indicator):
-        Exit=exit_decision
-        Ind=exit_indicator
-        beta=0.95
-        vt=np.zeros((NS,T+1,K,2)) # per-period profit or exit choice 
-        V=np.zeros((NS,K)) # present discounted value, for equation 3
-        EV=np.zeros((NS,1)) # average over K iterations, for each initial state s
-        for k in range(K):
-                for i in range (NS):
-                        for t in range(T):
-                                x1=ST[i,0,t,k].astype(int)
-                                x2=ST[i,1,t,k].astype(int)
-                                x3=ST[i,2,t,k].astype(int)
-                                vt[i,t,k,0]=np.power(beta,t)*(1-Ind[i,0,t,k])*pi(x1,x2,x3) # earn profits up to (& incl) exit period t
-                                vt[i,t,k,1]=np.power(beta,t)*Exit[i,0,t,k] # receive one-time exit value at t
-                        V[i,k]=np.sum(vt[i,:,k,0])+np.sum(vt[i,:,k,1]) 
-        for i in range(NS):
-                EV[i]=np.mean(V[i,:])
-        return EV
-
-
-# (3c) Simulated exit strategy
+# Exit strategies
 X1=np.zeros((NS,NF,T+1,K))  # optimal exit decision given initial state s
 XT=np.zeros((NS,NF,T+1,K))  # indicator whether the firm has exited in any t
 for k in range(K):
@@ -283,20 +264,41 @@ for k in range(K):
                         for t in range(T):
                                 if np.sum(X1[i,j,:,k])==0:
                                         X1[i,j,t,k]=X[i,j,t,k]
-                                        XT[i,j,t+1,k]=X[i,j,t,k] # indicator starts in period after exit
+                                        XT[i,j,t+1,k]=X[i,j,t,k] 
                                 else:
                                         XT[i,j,t+1,k]=1
 
+# Vector for equilibrum play (equation 3)
+def V(exit_decision,exit_indicator):
+        Exit=exit_decision #X1
+        Ind=exit_indicator #XT
+        beta=0.95
+        v=np.zeros((NS,T+1,K,2)) # Vector in equation 3
+        v_sum=np.zeros((NS,K,2)) # present discounted value, for equation 3
+        v_avg=np.zeros((NS,2)) # average over K iterations, for each initial state s
+        for k in range(K):
+                for i in range (NS):
+                        for t in range(T):
+                                x1=ST[i,0,t,k].astype(int)
+                                x2=ST[i,1,t,k].astype(int)
+                                x3=ST[i,2,t,k].astype(int)
+                                v[i,t,k,0]=np.power(beta,t)*(1-Ind[i,0,t,k])*pi(x1,x2,x3) 
+                                v[i,t,k,1]=np.power(beta,t)*Exit[i,0,t,k]
+                        v_sum[i,k,0]=np.sum(v[i,:,k,0])
+                        v_sum[i,k,1]=np.sum(v[i,:,k,1]) 
+        for i in range(NS):
+                v_avg[i,0]=np.mean(v_sum[i,:,0])
+                v_avg[i,1]=np.mean(v_sum[i,:,1])
+        return v_avg
 
-# Generate M perturbations of optimal exit and calculate EV for each m
+# (3c) Generate M perturbations 
 M=200
 X1m=np.zeros((NS,NF,T+1,K,M))
 XTm=np.zeros((NS,NF,T+1,K,M))
-EVm=np.zeros((NS,M))
 for m in range(M):
         for k in range(K):
                 for i in range(NS):
-                        for t in range(5,T-4):
+                        for t in range(5,T-5):
                                 if X1[i,0,t,k]==1:
                                         tau=t+random.choice([-5,-4,-3,-2,-1,1,2,3,4,5])
                                         X1m[i,0,t,k,m]=0
@@ -305,30 +307,150 @@ for m in range(M):
                         for t in range(T):
                                 if XTm[i,0,t,k,m]==1:
                                         XTm[i,0,t+1,k,m]=1
+
+
+
+# (3d) Calculate phi from moment inequalities
+
+# Equilibrium play
+eq_v=V(X1,XT)
+
+# Off-equilibrium play
+offeq_v=np.zeros((NS,2,M))
+for m in range(M):
         x1=X1m[:,:,:,:,m]
         xt=XTm[:,:,:,:,m]
-        ev=EV(x1,xt)
-        for i in range(NS):
-                EVm[i,m]=ev[i]
+        offeq_v[:,:,m]=V(x1,xt)
 
-# (3d) Calculate phi(s_0)
-prob_exit=np.zeros((NS,1)) # put p_exit into a NS x 1 vector
+
+# Objective function for moment inequality
+def objfn(phi):
+        w=v0-v1                         # v0 is eqn(3) under equilibrium play
+        fn=w[0]+w[1]*phi
+        if phi >= 0:
+                if fn >= 0:             # if phi satisfies the moment inequality
+                        return fn
+                else:
+                        return 9999     # if phi does not satisfy the moment inequality
+        else:
+                if fn <= 0:             # sign flips if phi < 0
+                        return fn
+                else:
+                        return 9999     # if phi does not satisfy the moment inequality
+
+# Note: if phi does not satisfy the moment inequality, fsolve will return phi = 0 
+
+# For each m, find phi that satisfies moment inequality
+phi=np.zeros((NS,M))
+phi_LB=np.zeros((NS,1))
+phi_UB=np.zeros((NS,1))
 for i in range(NS):
-        prob_exit[i]=p_exit(S[i,0],S[i,1],S[i,2])
+        for m in range(M):
+                v1=offeq_v[i,:,m]
+                v0=eq_v[i,:]
+                phi_init=0
+                phi[i,m]=fsolve(objfn,phi_init)
+        phi_LB[i]=np.min(phi[i,:])
+        phi_UB[i]=np.max(phi[i,:])
 
-phi=np.zeros((NS,1))
-exp_value=EV(X1,XT)
-phi=((1-beta)*exp_value-(1-prob_exit)*pi1)/prob_exit # NS x 1 vector for every initial state
+# Note: if phi = 0 then phi is undefined as no exit is observed in equilibrium play
 
-# phi_M=np.zeros((NS,M))
-# for m in range(M):
-#         for i in range(NS):
-#                 phi_M[i,m]=((1-beta)*EVm[i,m]-(1-prob_exit[i])*pi1[i])/prob_exit[i]
+# (3e) Store E[V(s)] using phi_UB, for all s
+EVs=np.zeros((NS,1))
+for i in range(NS):
+        phi=phi_UB[i]
+        if phi==100:
+                EVs[i]=eq_v[i,0]+eq_v[i,1]*0 # no exit, so no scrap value
+        else:
+                EVs[i]=eq_v[i,0]+eq_v[i,1]*phi
 
-# phi_LB=np.zeros((NS,1))
-# phi_UB=np.zeros((NS,1))
-# for i in range(NS):
-#         phi_LB[i]=np.min(phi_M[i,:])
-#         phi_UB[i]=np.max(phi_M[i,:])
 
-# phi_mat=pd.DataFrame(np.concatenate((phi_LB,phi,phi_UB),axis=1))
+# (3f) Expected value of an entrant
+
+# Unique states for entrants
+se=S[168:len(S),:]
+NSe=len(se)
+
+# Expected value of entrant for each unique (0,s2,s3)
+EV_entrant=np.zeros((NSe,1))
+for s in range(NSe):
+        w1=s+28*0
+        w2=s+28*1
+        w3=s+28*2
+        w4=s+28*3
+        w5=s+28*4
+        w6=s+28*5
+        EV_entrant[s]=np.mean((EVs[w1],EVs[w2],EVs[w3],EVs[w4],EVs[w5],EVs[w6]))
+
+# (3g) Solve for kappa (mean and sd)
+
+# Estimated p_enter for each entrant state
+p_enter_est=np.zeros((NSe,1))
+for s in range(NSe):
+        x1=se[s,0]
+        x2=se[s,1]
+        x3=se[s,2]
+        p_enter_est[s]=p_enter(x1,x2,x3)
+
+# Function for p_enter_k
+def p_enter_k(kappa):
+        mu=kappa[0]
+        sigma=kappa[1]
+        p_enter_k=np.zeros((NSe,1))
+        for s in range(NSe):
+                beta=0.95
+                x=beta*EV_entrant[s]
+                p_enter_k[s]=norm.cdf(x,loc=mu,scale=sigma)
+        return p_enter_k
+
+# Function for min dist between p_enter_est and p_enter_hat
+def objfn_k(kappa):
+        fn=np.linalg.norm(p_enter_est-p_enter_k(kappa))
+        return fn
+
+# Minimize
+kappa_init=np.array([[0],[1]])
+results=minimize(objfn_k,kappa_init,\
+        method='Nelder-Mead',options={'maxiter':1000})
+
+ # final_simplex: (array([[ 63.81615668, 127.73173269],
+ #       [ 63.81619228, 127.73181503],
+ #       [ 63.81619393, 127.73179742]]), array([0.51653053, 0.51653053, 0.51653053]))
+ #           fun: 0.5165305280563075
+ #       message: 'Optimization terminated successfully.'
+ #          nfev: 410
+ #           nit: 215
+ #        status: 0
+ #       success: True
+ #             x: array([ 63.81615668, 127.73173269])
+
+
+# (4) Counterfactuals
+
+# (4a) Use (3f) and (3g) to calculate p_enter
+mu_k=results.x[0]
+sigma_k=results.x[1]
+p_enter_k=np.zeros((NSe,1))
+for s in range(NSe):
+        p_enter_k[s]=norm.cdf(beta*EV_entrant[s],loc=mu_k,scale=sigma_k)
+
+# (4b) Calculate long-run expected discounted profits,
+# entry rates, and markups from paths starting at s0 = (0,3,3) (index: 186)
+
+LR_exp_profits=v_eq[186,0] # LR expected profits
+entry_rate_est=p_enter(0,3,3)
+entry_rate_hat=p_enter_k[19]
+cost=np.zeros((6))
+for c in range(6):
+        cost[c]=alpha_hat/(alpha_hat+c)
+
+exp_markup=np.mean((pi(1,3,3)/cost[0],pi(2,3,3)/cost[1],pi(3,3,3)/cost[2],\
+        pi(4,3,3)/cost[3],pi(5,3,3)/cost[4],pi(6,3,3)/cost[5]))
+
+# (4c) Use (3f) and (3g) to simulate p_enter_1
+p_enter_k1=np.zeros((NSe,1))
+for s in range(NSe):
+        p_enter_k1[s]=norm.cdf(beta*EV_entrant[s],loc=2*mu_k,scale=sigma_k)
+
+# (4d) Use p_enter_k1 to recalculate expected value of entrant
+   
